@@ -1,0 +1,13 @@
+node_modules
+dist
+# Keep environment variables out of version control
+.env
+
+/generated/prisma
+
+# Local AI tooling scaffolding (not part of the project)
+.agents/
+.claude/
+.windsurf/
+.cursor/
+skills-lock.json
