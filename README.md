@@ -2,7 +2,7 @@
 
 # Saluna Backend
 
-Backend API for Saluna (Arabian Taste) built with NestJS, Prisma, and PostgreSQL.
+Backend API for Saluna Beach Club built with NestJS, Prisma, and PostgreSQL.
 
 ## Stack
 
@@ -68,7 +68,16 @@ OpenAPI JSON (import this into Postman as a collection): `http://localhost:4000/
 | PATCH  | /reservations/:id   | Partially update a reservation (including `status`)      |
 | DELETE | /reservations/:id   | Cancel a reservation (sets `status = CANCELLED`, does not delete the row) |
 
+## Deploying (Railway)
+
+This repo includes a `railway.json` that tells Railway to run `npm run start:prod`, which applies pending Prisma migrations (`prisma migrate deploy`) before starting the server — no manual migration step needed after each deploy.
+
+1. Create a new Railway project, add a **PostgreSQL** plugin to it.
+2. Add this repo as a service in the same project; Railway auto-injects `DATABASE_URL` from the Postgres plugin when they're linked.
+3. Set the `PORT` env var if not already provided by Railway automatically.
+4. After the first successful deploy, run `npx prisma db seed` once against the production database (via `railway run npx prisma db seed` using the Railway CLI, linked to this service) to populate the real menu catalog.
+
 ## Notes
 
 - Menu seed data mirrors `saluna-frontend/server/data/menuData.ts` so both apps start from the same catalog.
-- This backend is independent from `saluna-frontend` for now — the frontend's existing mock API routes are untouched. Wiring the frontend to this backend is a separate, later step.
+- **This backend is now wired to `saluna-frontend`**: the frontend's public `/api/menu` route and its admin menu CRUD pages both proxy to this API instead of using static mock data.
