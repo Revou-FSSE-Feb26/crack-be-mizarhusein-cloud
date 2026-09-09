@@ -68,14 +68,20 @@ OpenAPI JSON (import this into Postman as a collection): `http://localhost:4000/
 | PATCH  | /reservations/:id   | Partially update a reservation (including `status`)      |
 | DELETE | /reservations/:id   | Cancel a reservation (sets `status = CANCELLED`, does not delete the row) |
 
-## Deploying (Railway)
+## Deploying (Render + Supabase)
 
-This repo includes a `railway.json` that tells Railway to run `npm run start:prod`, which applies pending Prisma migrations (`prisma migrate deploy`) before starting the server — no manual migration step needed after each deploy.
+Database is hosted on **Supabase** (Postgres), API on **Render** (Node web service). `npm run start:prod` already runs `prisma migrate deploy` before `node dist/main`, so migrations apply automatically on every deploy — no manual step needed.
 
-1. Create a new Railway project, add a **PostgreSQL** plugin to it.
-2. Add this repo as a service in the same project; Railway auto-injects `DATABASE_URL` from the Postgres plugin when they're linked.
-3. Set the `PORT` env var if not already provided by Railway automatically.
-4. After the first successful deploy, run `npx prisma db seed` once against the production database (via `railway run npx prisma db seed` using the Railway CLI, linked to this service) to populate the real menu catalog.
+1. Create a Supabase project, then grab the **direct connection** string from Project Settings → Database → Connection string (URI). Use this as `DATABASE_URL`.
+2. On Render: New → Web Service → connect this repo.
+   - Build Command: `npm install && npm run build`
+   - Start Command: `npm run start:prod`
+   - Environment variable: `DATABASE_URL` = the Supabase connection string above.
+   - Do **not** set `PORT` manually — Render injects its own and `main.ts` already reads `process.env.PORT`.
+3. Seed the real menu catalog once, run locally against Supabase:
+   ```
+   DATABASE_URL="<supabase-connection-string>" npx prisma db seed
+   ```
 
 ## Notes
 
