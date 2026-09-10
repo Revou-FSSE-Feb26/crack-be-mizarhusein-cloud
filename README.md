@@ -68,19 +68,17 @@ OpenAPI JSON (import this into Postman as a collection): `http://localhost:4000/
 | PATCH  | /reservations/:id   | Partially update a reservation (including `status`)      |
 | DELETE | /reservations/:id   | Cancel a reservation (sets `status = CANCELLED`, does not delete the row) |
 
-## Deploying (Render + Supabase)
+## Deploying (Railway + Supabase)
 
-Database is hosted on **Supabase** (Postgres), API on **Render** (Node web service). `npm run start:prod` already runs `prisma migrate deploy` before `node dist/main`, so migrations apply automatically on every deploy — no manual step needed.
+Database is hosted on **Supabase** (Postgres, via its pooler endpoints — the direct `db.<ref>.supabase.co:5432` host is IPv6-only and unreachable from some networks), API compute on **Railway**. `railway.json` tells Railway to run `npm run start:prod`, which applies pending Prisma migrations (`prisma migrate deploy`) before starting the server — no manual migration step needed after each deploy.
 
-1. Create a Supabase project, then grab the **direct connection** string from Project Settings → Database → Connection string (URI). Use this as `DATABASE_URL`.
-2. On Render: New → Web Service → connect this repo.
-   - Build Command: `npm install && npm run build`
-   - Start Command: `npm run start:prod`
-   - Environment variable: `DATABASE_URL` = the Supabase connection string above.
-   - Do **not** set `PORT` manually — Render injects its own and `main.ts` already reads `process.env.PORT`.
-3. Seed the real menu catalog once, run locally against Supabase:
+1. In Supabase: Project Settings → Database → **Connect** → **ORM** tab → **Prisma** — copy both `DATABASE_URL` (transaction pooler, port 6543, `?pgbouncer=true`) and `DIRECT_URL` (session pooler, port 5432). Percent-encode any `@`/`%` in your DB password (`@` → `%40`, `%` → `%25`).
+2. On Railway: New Project → Deploy from GitHub repo → this repo.
+   - Add both env vars from step 1: `DATABASE_URL` and `DIRECT_URL`.
+   - No Postgres plugin needed on Railway — the database lives on Supabase, not Railway.
+3. After the first deploy, seed the real menu catalog once (run locally, pointed at Supabase):
    ```
-   DATABASE_URL="<supabase-connection-string>" npx prisma db seed
+   DATABASE_URL="<supabase-pooler-url>" DIRECT_URL="<supabase-direct-pooler-url>" npx prisma db seed
    ```
 
 ## Notes
