@@ -1,0 +1,982 @@
+{
+  "info": {
+    "_postman_id": "4d1e9182-2eee-4283-b33e-5a0f0c9afc4e",
+    "name": "Saluna Backend API",
+    "description": "Auth (register/login/JWT), Menu, and Reservation endpoints for saluna-backend. Run the whole collection top to bottom (or at least \"Auth > Login - Admin (seeded)\" first) so {{access_token}} is populated for the protected Menu/Reservation requests.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.collectionVariables.get(\"test_email\")) {",
+          "  pm.collectionVariables.set(\"test_email\", \"postman-tester-\" + Date.now() + \"@example.com\");",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:4000",
+      "type": "string"
+    },
+    {
+      "key": "admin_email",
+      "value": "admin1@gmail.com",
+      "type": "string"
+    },
+    {
+      "key": "admin_password",
+      "value": "admin098",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "test_email",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "test_password",
+      "value": "testpass123",
+      "type": "string"
+    },
+    {
+      "key": "menu_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "reservation_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login - Admin (seeded)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.test(\"has access_token\", () => pm.expect(data.access_token).to.be.a(\"string\"));",
+                  "pm.collectionVariables.set(\"access_token\", data.access_token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login - Wrong Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"this-is-wrong\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test(\"status is 401\", () => pm.response.to.have.status(401));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register - New User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{test_email}}\",\n  \"password\": \"{{test_password}}\",\n  \"name\": \"Postman Tester\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json();",
+                  "pm.test(\"has access_token\", () => pm.expect(data.access_token).to.be.a(\"string\"));",
+                  "pm.test(\"user email matches\", () => pm.expect(data.user.email).to.eql(pm.collectionVariables.get(\"test_email\")));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register - Duplicate Email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{test_email}}\",\n  \"password\": \"{{test_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test(\"status is 409 (conflict)\", () => pm.response.to.have.status(409));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register - Invalid Body",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"not-an-email\",\n  \"password\": \"123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test(\"status is 400 (validation error)\", () => pm.response.to.have.status(400));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Menu",
+      "item": [
+        {
+          "name": "List Menus (Public)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/menus",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "menus"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"returns an array\", () => pm.expect(pm.response.json()).to.be.an(\"array\"));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Menu - Unauthorized",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/menus",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "menus"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman Test Pizza\",\n  \"description\": \"temp\",\n  \"price\": 1000,\n  \"image\": \"\",\n  \"category\": \"pizza\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test(\"status is 401 without token\", () => pm.response.to.have.status(401));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Menu (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/menus",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "menus"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman Test Pizza\",\n  \"description\": \"temp\",\n  \"price\": 1000,\n  \"image\": \"\",\n  \"category\": \"pizza\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set(\"menu_id\", data.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Menu by ID (Public)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/menus/{{menu_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "menus",
+                "{{menu_id}}"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"name matches created item\", () => pm.expect(pm.response.json().name).to.eql(\"Postman Test Pizza\"));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Menu - PATCH (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/menus/{{menu_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "menus",
+                "{{menu_id}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"price\": 2000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"price updated\", () => pm.expect(pm.response.json().price).to.eql(2000));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Replace Menu - PUT (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/menus/{{menu_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "menus",
+                "{{menu_id}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman Test Pizza v2\",\n  \"description\": \"temp v2\",\n  \"price\": 3000,\n  \"image\": \"\",\n  \"category\": \"pizza\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete Menu - Unauthorized",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/menus/{{menu_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "menus",
+                "{{menu_id}}"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test(\"status is 401 without token\", () => pm.response.to.have.status(401));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete Menu (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/menus/{{menu_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "menus",
+                "{{menu_id}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Menu by ID - After Delete (expect 404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/menus/{{menu_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "menus",
+                "{{menu_id}}"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test(\"status is 404 (deleted)\", () => pm.response.to.have.status(404));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Reservation",
+      "item": [
+        {
+          "name": "Create Reservation (Public)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/reservations",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reservations"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerName\": \"Postman QA\",\n  \"email\": \"{{test_email}}\",\n  \"phone\": \"+62 812 0000 9999\",\n  \"partySize\": 2,\n  \"date\": \"2026-12-01T18:00:00.000Z\",\n  \"notes\": \"Created by Postman collection\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json();",
+                  "pm.test(\"status is PENDING\", () => pm.expect(data.status).to.eql(\"PENDING\"));",
+                  "pm.collectionVariables.set(\"reservation_id\", data.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Reservations - Unauthorized",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/reservations",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reservations"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test(\"status is 401 without token\", () => pm.response.to.have.status(401));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Reservations (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/reservations",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reservations"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const ids = pm.response.json().map(r => String(r.id));",
+                  "pm.test(\"contains created reservation\", () => pm.expect(ids).to.include(String(pm.collectionVariables.get(\"reservation_id\"))));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Reservation by ID (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/reservations/{{reservation_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reservations",
+                "{{reservation_id}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Reservation Status (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/reservations/{{reservation_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reservations",
+                "{{reservation_id}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"CONFIRMED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"status is now CONFIRMED\", () => pm.expect(pm.response.json().status).to.eql(\"CONFIRMED\"));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cancel Reservation (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/reservations/{{reservation_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reservations",
+                "{{reservation_id}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"status is now CANCELLED\", () => pm.expect(pm.response.json().status).to.eql(\"CANCELLED\"));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

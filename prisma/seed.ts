@@ -1,6 +1,14 @@
 import { PrismaClient, ReservationStatus } from '@prisma/client';
+import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
+
+// Same credentials the admin dashboard already used before the backend had
+// a real auth system, kept for continuity. Change the password later via a
+// fresh POST /auth/register + manual DB cleanup, or add a change-password
+// endpoint if that becomes a real need.
+const ADMIN_SEED_EMAIL = 'admin1@gmail.com';
+const ADMIN_SEED_PASSWORD = 'admin098';
 
 // Mirrors saluna-frontend/server/data/menuData.ts so both apps start from the same catalog.
 const menuItems = [
@@ -202,8 +210,19 @@ async function main() {
     await prisma.reservation.create({ data: reservation });
   }
 
+  const hashedPassword = await bcrypt.hash(ADMIN_SEED_PASSWORD, 10);
+  await prisma.user.upsert({
+    where: { email: ADMIN_SEED_EMAIL },
+    update: {},
+    create: {
+      email: ADMIN_SEED_EMAIL,
+      password: hashedPassword,
+      name: 'Admin Saluna',
+    },
+  });
+
   console.log(
-    `Seeded ${menuItems.length} menu items and ${reservations.length} reservations.`,
+    `Seeded ${menuItems.length} menu items, ${reservations.length} reservations, and 1 admin user.`,
   );
 }
 

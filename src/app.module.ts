@@ -5,11 +5,13 @@ import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { MenuModule } from './menu/menu.module';
 import { ReservationModule } from './reservation/reservation.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
+    AuthModule,
     MenuModule,
     ReservationModule,
   ],

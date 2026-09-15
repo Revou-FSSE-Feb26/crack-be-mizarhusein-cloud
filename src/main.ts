@@ -18,9 +18,10 @@ async function bootstrap() {
   const config = new DocumentBuilder()
     .setTitle('Saluna API')
     .setDescription(
-      'Backend API for Saluna (Arabian Taste) — menus & reservations',
+      'Backend API for Saluna (Arabian Taste) — auth, menus & reservations',
     )
     .setVersion('1.0')
+    .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api-docs', app, document);
