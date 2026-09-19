@@ -58,6 +58,10 @@
       "key": "reservation_id",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "customer_token",
+      "value": ""
     }
   ],
   "item": [
@@ -109,6 +113,7 @@
                   "const data = pm.response.json();",
                   "pm.test(\"has access_token\", () => pm.expect(data.access_token).to.be.a(\"string\"));",
                   "pm.collectionVariables.set(\"access_token\", data.access_token);",
+                  "pm.test(\"role is ADMIN\", () => pm.expect(data.user.role).to.eql(\"ADMIN\"));",
                   "}"
                 ]
               }
@@ -164,7 +169,7 @@
           ]
         },
         {
-          "name": "Register - New User",
+          "name": "Register - New Customer",
           "request": {
             "method": "POST",
             "header": [
@@ -208,6 +213,56 @@
                   "const data = pm.response.json();",
                   "pm.test(\"has access_token\", () => pm.expect(data.access_token).to.be.a(\"string\"));",
                   "pm.test(\"user email matches\", () => pm.expect(data.user.email).to.eql(pm.collectionVariables.get(\"test_email\")));",
+                  "pm.test(\"new accounts are CUSTOMER\", () => pm.expect(data.user.role).to.eql(\"CUSTOMER\"));",
+                  "pm.collectionVariables.set(\"customer_token\", data.access_token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register - Cannot Self-Assign Role (expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"hacker-{{test_email}}\",\n  \"password\": \"testpass123\",\n  \"role\": \"ADMIN\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test(\"status is 400 (role is not an accepted field)\", () => pm.response.to.have.status(400));",
                   "}"
                 ]
               }
@@ -390,6 +445,60 @@
                 "exec": [
                   "{",
                   "pm.test(\"status is 401 without token\", () => pm.response.to.have.status(401));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Menu - Forbidden for Customer (expect 403)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/menus",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "menus"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman Test Pizza\",\n  \"description\": \"temp\",\n  \"price\": 1000,\n  \"image\": \"\",\n  \"category\": \"pizza\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test(\"status is 403 for a CUSTOMER token\", () => pm.response.to.have.status(403));",
                   "}"
                 ]
               }
@@ -713,7 +822,7 @@
       "name": "Reservation",
       "item": [
         {
-          "name": "Create Reservation (Public)",
+          "name": "Create Reservation - Unauthorized (login required)",
           "request": {
             "method": "POST",
             "header": [
@@ -731,6 +840,9 @@
                 "reservations"
               ]
             },
+            "auth": {
+              "type": "noauth"
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"customerName\": \"Postman QA\",\n  \"email\": \"{{test_email}}\",\n  \"phone\": \"+62 812 0000 9999\",\n  \"partySize\": 2,\n  \"date\": \"2026-12-01T18:00:00.000Z\",\n  \"notes\": \"Created by Postman collection\"\n}",
@@ -739,9 +851,60 @@
                   "language": "json"
                 }
               }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test(\"status is 401 without a token\", () => pm.response.to.have.status(401));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Reservation (Customer)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/reservations",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reservations"
+              ]
             },
             "auth": {
-              "type": "noauth"
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerName\": \"Postman QA\",\n  \"email\": \"{{test_email}}\",\n  \"phone\": \"+62 812 0000 9999\",\n  \"partySize\": 2,\n  \"date\": \"2026-12-01T18:00:00.000Z\",\n  \"notes\": \"Created by Postman collection\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           },
           "response": [],
@@ -755,7 +918,91 @@
                   "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
                   "const data = pm.response.json();",
                   "pm.test(\"status is PENDING\", () => pm.expect(data.status).to.eql(\"PENDING\"));",
+                  "pm.test(\"linked to the customer account\", () => pm.expect(data.userId).to.be.a(\"number\"));",
                   "pm.collectionVariables.set(\"reservation_id\", data.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "My Reservations (Customer)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/reservations/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reservations",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const ids = pm.response.json().map(r => String(r.id));",
+                  "pm.test(\"contains my reservation\", () => pm.expect(ids).to.include(String(pm.collectionVariables.get(\"reservation_id\"))));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Reservations - Forbidden for Customer (expect 403)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/reservations",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reservations"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test(\"status is 403 for a CUSTOMER token\", () => pm.response.to.have.status(403));",
                   "}"
                 ]
               }
@@ -928,6 +1175,91 @@
                   "{",
                   "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
                   "pm.test(\"status is now CONFIRMED\", () => pm.expect(pm.response.json().status).to.eql(\"CONFIRMED\"));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cancel Own Reservation (Customer)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/reservations/me/{{reservation_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reservations",
+                "me",
+                "{{reservation_id}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"status is CANCELLED\", () => pm.expect(pm.response.json().status).to.eql(\"CANCELLED\"));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cancel Own Reservation Again (expect 400)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/reservations/me/{{reservation_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reservations",
+                "me",
+                "{{reservation_id}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test(\"status is 400 - already cancelled\", () => pm.response.to.have.status(400));",
                   "}"
                 ]
               }

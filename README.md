@@ -8,6 +8,7 @@ Backend API for Saluna Beach Club built with NestJS, Prisma, and PostgreSQL.
 
 - NestJS (Express platform)
 - PostgreSQL via Prisma ORM
+- JWT auth (Passport) with two roles: `ADMIN` and `CUSTOMER`
 - Swagger / OpenAPI for API docs (importable into Postman)
 
 ## Getting started
@@ -28,7 +29,7 @@ Backend API for Saluna Beach Club built with NestJS, Prisma, and PostgreSQL.
    ```
    npx prisma migrate dev
    ```
-5. Seed the database with mock data (includes one admin user, see [Auth](#auth) below):
+5. Seed the database with mock data (menu catalog, sample reservations, and one admin user, see [Auth](#auth) below). **Local development only — the seed deletes all menus and reservations first.**
    ```
    npx prisma db seed
    ```
@@ -41,16 +42,35 @@ The API listens on `http://localhost:4000` (or whatever `PORT` is set to in `.en
 
 ## Auth
 
-Login/register issue a JWT (`Authorization: Bearer <token>`, 8h expiry, signed with `JWT_SECRET`). Passwords are hashed with bcrypt, never stored or returned in plain text.
+Login/register issue a JWT (`Authorization: Bearer <token>`, 8h expiry, signed with `JWT_SECRET`). The token carries the user's `role`. Passwords are hashed with bcrypt, never stored or returned in plain text. Emails are trimmed and lower-cased, so login is case-insensitive.
 
 | Method | Path            | Auth   | Description                              |
 | ------ | --------------- | ------ | ----------------------------------------- |
-| POST   | /auth/register  | Public | Create a user, returns `{ access_token, user }` |
-| POST   | /auth/login     | Public | Returns `{ access_token, user }` |
+| POST   | /auth/register  | Public | Create a **customer** account, returns `{ access_token, user }`. No email verification, the account can log in immediately. |
+| POST   | /auth/login     | Public | Returns `{ access_token, user }` (`user.role` is `ADMIN` or `CUSTOMER`) |
 
-The seed script creates one admin user (`admin1@gmail.com` / `admin098` — the same credentials the admin dashboard already used before this backend had real auth). Change it by registering a new user and updating who the frontend's admin dashboard expects to log in as.
+### Roles
 
-`saluna-frontend`'s admin login page and dashboard call this API directly — `saluna-frontend`'s `ADMIN_SESSION_SECRET` env var must be set to the **same value** as this app's `JWT_SECRET`, since the frontend only verifies the JWT this backend signs.
+| Role       | How you get it | What it can do |
+| ---------- | -------------- | -------------- |
+| `CUSTOMER` | Sign up via `POST /auth/register` (the only role public sign-up can create; sending a `role` field is rejected with 400) | Book a table, view and cancel **their own** reservations |
+| `ADMIN`    | Created with `npm run create-admin` (or the seed, locally) | Everything a customer can, plus manage the menu and see/update/cancel **all** reservations |
+
+Routes are protected with the `@Auth(...roles)` decorator (`src/auth/roles.decorator.ts`): `@Auth()` means "any logged-in user", `@Auth(Role.ADMIN)` means admin only. A missing/invalid token gets `401`; a valid token with the wrong role gets `403`.
+
+### Creating an admin
+
+`create-admin` creates the admin or resets its password/role, and **never touches menus or reservations**, so it is safe to run against production:
+
+```
+ADMIN_EMAIL=you@example.com ADMIN_PASSWORD='a-strong-password' npm run create-admin
+```
+
+For a hosted database, run it against that database with the platform's env injected, e.g. `railway run npm run create-admin` (with `ADMIN_EMAIL` / `ADMIN_PASSWORD` set in your shell).
+
+The local seed also creates an admin (`admin1@gmail.com` / `admin098`). That password is public in this repo, so **never use it in production**; create your own admin instead.
+
+`saluna-frontend` calls this API directly for login/register — `saluna-frontend`'s `ADMIN_SESSION_SECRET` env var must be set to the **same value** as this app's `JWT_SECRET`, since the frontend only verifies the JWT this backend signs.
 
 ## API docs / Postman
 
@@ -58,7 +78,7 @@ Swagger UI: `http://localhost:4000/api-docs`
 
 OpenAPI JSON (import this into Postman as a collection): `http://localhost:4000/api-docs-json`
 
-**Ready-made Postman collection**: `postman/Saluna-Backend-API.postman_collection.json` — covers Auth (login/register, including the 401/409/400 negative cases), Menu (public reads + JWT-gated writes), and Reservation (public create + JWT-gated list/update/cancel). Import it into Postman and run the whole collection top-to-bottom (Collection Runner, or the ▶ button) — it logs in as the seeded admin automatically, chains the created menu/reservation ids into the later requests via collection variables, and asserts the expected status code + response shape on every request. Also runnable headlessly with [Newman](https://www.npmjs.com/package/newman):
+**Ready-made Postman collection**: `postman/Saluna-Backend-API.postman_collection.json` — covers Auth (login/register, including the 401/409/400 negative cases and a check that a role can't be self-assigned), Menu (public reads, admin-only writes, and a 403 for customers), and Reservation (login-required booking, customer "my reservations"/cancel, admin list/update/cancel, and 401/403 negative cases). Import it into Postman and run the whole collection top-to-bottom (Collection Runner, or the ▶ button) — it logs in as the seeded admin and registers a throwaway customer automatically, chains the created menu/reservation ids into the later requests via collection variables, and asserts the expected status code + response shape on every request. It expects the seeded admin, so run `npx prisma db seed` on your local database first. Also runnable headlessly with [Newman](https://www.npmjs.com/package/newman):
 ```
 npx newman run postman/Saluna-Backend-API.postman_collection.json
 ```
@@ -71,22 +91,24 @@ npx newman run postman/Saluna-Backend-API.postman_collection.json
 | ------ | ------------- | ----------- | ------------------------------------- |
 | GET    | /menus        | Public      | List menu items (optional `?category=`) |
 | GET    | /menus/:id    | Public      | Get one menu item                    |
-| POST   | /menus        | Bearer JWT  | Create a menu item                   |
-| PUT    | /menus/:id    | Bearer JWT  | Replace a menu item                  |
-| PATCH  | /menus/:id    | Bearer JWT  | Partially update a menu item         |
-| DELETE | /menus/:id    | Bearer JWT  | Delete a menu item                   |
+| POST   | /menus        | Admin       | Create a menu item                   |
+| PUT    | /menus/:id    | Admin       | Replace a menu item                  |
+| PATCH  | /menus/:id    | Admin       | Partially update a menu item         |
+| DELETE | /menus/:id    | Admin       | Delete a menu item                   |
 
 ### Reservations
 
-| Method | Path                | Auth        | Description                                            |
-| ------ | ------------------- | ----------- | ------------------------------------------------------- |
-| POST   | /reservations       | Public      | Create a reservation (customers book without logging in) |
-| GET    | /reservations       | Bearer JWT  | List reservations (optional `?status=`)                 |
-| GET    | /reservations/:id   | Bearer JWT  | Get one reservation                                      |
-| PATCH  | /reservations/:id   | Bearer JWT  | Partially update a reservation (including `status`)      |
-| DELETE | /reservations/:id   | Bearer JWT  | Cancel a reservation (sets `status = CANCELLED`, does not delete the row) |
+| Method | Path                    | Auth            | Description                                            |
+| ------ | ----------------------- | --------------- | ------------------------------------------------------- |
+| POST   | /reservations           | Any logged-in user | Create a reservation, linked to the caller's account |
+| GET    | /reservations/me        | Any logged-in user | The caller's own reservations                         |
+| DELETE | /reservations/me/:id    | Any logged-in user | Cancel one of the caller's own `PENDING`/`CONFIRMED` reservations (someone else's id returns 404) |
+| GET    | /reservations           | Admin           | List all reservations (optional `?status=`)             |
+| GET    | /reservations/:id       | Admin           | Get one reservation                                      |
+| PATCH  | /reservations/:id       | Admin           | Partially update a reservation (including `status`)      |
+| DELETE | /reservations/:id       | Admin           | Cancel a reservation (sets `status = CANCELLED`, does not delete the row) |
 
-Menu/reservation writes and reservation reads are admin-only because reservations carry customer PII (name/email/phone) and menu writes should only come from the admin dashboard. Get a token from `POST /auth/login` first.
+Booking requires an account (customers must register/log in first). The full reservation list and menu writes are admin-only because reservations carry customer PII (name/email/phone) and menu changes should only come from the admin dashboard. Get a token from `POST /auth/login` first.
 
 ## Deploying (Railway + Supabase)
 
@@ -96,10 +118,14 @@ Database is hosted on **Supabase** (Postgres, via its pooler endpoints — the d
 2. On Railway: New Project → Deploy from GitHub repo → this repo.
    - Add env vars from step 1 (`DATABASE_URL`, `DIRECT_URL`) plus `JWT_SECRET` (any long random string — must match `saluna-frontend`'s `ADMIN_SESSION_SECRET` exactly, see [Auth](#auth)).
    - No Postgres plugin needed on Railway — the database lives on Supabase, not Railway.
-3. After the first deploy, seed the real menu catalog + admin user once (run locally, pointed at Supabase):
+   - If pushes to GitHub don't trigger a deploy (the Railway GitHub app needs access to the repo/organization), deploy from your machine with `railway up` inside this folder.
+3. After the first deploy, create the admin user once (run locally with the production env injected, see [Creating an admin](#creating-an-admin)):
    ```
-   DATABASE_URL="<supabase-pooler-url>" DIRECT_URL="<supabase-direct-pooler-url>" npx prisma db seed
+   ADMIN_EMAIL=you@example.com ADMIN_PASSWORD='a-strong-password' railway run npm run create-admin
    ```
+   **Do not run `prisma db seed` against production.** It deletes every menu item and reservation before re-creating the sample data, which would wipe real customer bookings. The menu catalog can be managed from the admin dashboard.
+
+Migrations that change existing data are applied automatically on deploy. `20260919135916_add_roles_and_reservation_owner` adds the `role` column and promotes every account that existed at that point to `ADMIN` (before it, all accounts were admins).
 
 ## Testing
 
@@ -107,9 +133,9 @@ Database is hosted on **Supabase** (Postgres, via its pooler endpoints — the d
 npm run test:e2e
 ```
 
-Runs integration tests against a real running database (whatever `DATABASE_URL` points to) — auth (register/login/duplicate-email/bad-credentials), menu CRUD (public reads, JWT-gated writes), and reservation flow (public create, JWT-gated list/update/cancel). Each spec creates its own throwaway test user/records and cleans them up in `afterAll`; the seeded catalog/admin from `prisma db seed` is untouched.
+Runs integration tests against a real running database (whatever `DATABASE_URL` points to) — auth (register creates customers, role can't be self-assigned, login/duplicate-email/bad-credentials), menu CRUD (public reads, admin-only writes, 403 for customers), and the reservation flow (login required, ownership of "my reservations", customer vs admin permissions, cancelling). Each spec creates its own throwaway test users/records and cleans them up in `afterAll`; the seeded catalog/admin from `prisma db seed` is untouched. Requires a seeded local database (the menu spec expects the seeded catalog).
 
 ## Notes
 
 - Menu seed data mirrors `saluna-frontend/server/data/menuData.ts` so both apps start from the same catalog.
-- **This backend is now wired to `saluna-frontend`**: the frontend's public `/api/menu`/`/api/reservation` routes and its admin menu/reservation pages both proxy to this API instead of using static mock data. The admin login page also calls `POST /auth/login` here directly (via a frontend proxy route) and stores the returned JWT as an httpOnly cookie — see [Auth](#auth).
+- **This backend is wired to `saluna-frontend`**: the frontend's `/api/menu`, `/api/reservation`, `/api/auth/*` routes and its admin menu/reservation pages all proxy to this API instead of using static mock data. The frontend stores the returned JWT as an httpOnly cookie — see [Auth](#auth).
