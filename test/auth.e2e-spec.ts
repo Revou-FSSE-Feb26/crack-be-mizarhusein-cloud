@@ -42,7 +42,18 @@ describe('Auth (e2e)', () => {
       .expect(201);
 
     expect(res.body.access_token).toEqual(expect.any(String));
-    expect(res.body.user).toMatchObject({ email: testEmail, name: 'E2E Tester' });
+    expect(res.body.user).toMatchObject({
+      email: testEmail,
+      name: 'E2E Tester',
+      role: 'CUSTOMER',
+    });
+  });
+
+  it('POST /auth/register cannot be used to self-assign a role', () => {
+    return request(app.getHttpServer())
+      .post('/auth/register')
+      .send({ email: `e2e-role-${Date.now()}@example.com`, password: 'testpass123', role: 'ADMIN' })
+      .expect(400);
   });
 
   it('POST /auth/register rejects a duplicate email', () => {
@@ -66,5 +77,13 @@ describe('Auth (e2e)', () => {
       .expect(200);
 
     expect(res.body.access_token).toEqual(expect.any(String));
+    expect(res.body.user.role).toBe('CUSTOMER');
+  });
+
+  it('POST /auth/login treats the email case-insensitively', () => {
+    return request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email: testEmail.toUpperCase(), password: 'testpass123' })
+      .expect(200);
   });
 });

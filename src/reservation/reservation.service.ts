@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { ReservationStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
@@ -8,9 +12,40 @@ import { UpdateReservationDto } from './dto/update-reservation.dto';
 export class ReservationService {
   constructor(private readonly prisma: PrismaService) {}
 
-  create(dto: CreateReservationDto) {
+  create(dto: CreateReservationDto, userId: number) {
     return this.prisma.reservation.create({
-      data: { ...dto, date: new Date(dto.date) },
+      data: { ...dto, date: new Date(dto.date), userId },
+    });
+  }
+
+  // A customer's own bookings, soonest first.
+  findMine(userId: number) {
+    return this.prisma.reservation.findMany({
+      where: { userId },
+      orderBy: { date: 'asc' },
+    });
+  }
+
+  // Customers may cancel their own upcoming bookings. A booking that belongs to
+  // someone else is reported as 404 so ids of other people's bookings can't be probed.
+  async cancelMine(userId: number, id: number) {
+    const reservation = await this.prisma.reservation.findFirst({
+      where: { id, userId },
+    });
+    if (!reservation) {
+      throw new NotFoundException(`Reservation with id ${id} not found`);
+    }
+    if (
+      reservation.status !== ReservationStatus.PENDING &&
+      reservation.status !== ReservationStatus.CONFIRMED
+    ) {
+      throw new BadRequestException(
+        `A ${reservation.status.toLowerCase()} reservation cannot be cancelled`,
+      );
+    }
+    return this.prisma.reservation.update({
+      where: { id },
+      data: { status: ReservationStatus.CANCELLED },
     });
   }
 

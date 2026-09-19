@@ -3,14 +3,18 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
+import { Role } from '@prisma/client';
 import { PrismaService } from './../src/prisma/prisma.service';
+import { createUserToken } from './helpers';
 
 describe('Menu (e2e)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
   let token: string;
+  let customerToken: string;
   let createdId: number;
   const testEmail = `e2e-menu-${Date.now()}@example.com`;
+  const customerEmail = `e2e-menu-customer-${Date.now()}@example.com`;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -24,15 +28,15 @@ describe('Menu (e2e)', () => {
     await app.init();
     prisma = moduleFixture.get(PrismaService);
 
-    const registerRes = await request(app.getHttpServer())
-      .post('/auth/register')
-      .send({ email: testEmail, password: 'testpass123' });
-    token = registerRes.body.access_token;
+    token = await createUserToken(app, prisma, testEmail, Role.ADMIN);
+    customerToken = await createUserToken(app, prisma, customerEmail);
   });
 
   afterAll(async () => {
     await prisma.menu.deleteMany({ where: { name: 'E2E Test Pizza' } });
-    await prisma.user.deleteMany({ where: { email: testEmail } });
+    await prisma.user.deleteMany({
+      where: { email: { in: [testEmail, customerEmail] } },
+    });
     await app.close();
   });
 
@@ -49,7 +53,15 @@ describe('Menu (e2e)', () => {
       .expect(401);
   });
 
-  it('POST /menus creates an item when authenticated', async () => {
+  it('POST /menus is forbidden for a customer', () => {
+    return request(app.getHttpServer())
+      .post('/menus')
+      .set('Authorization', `Bearer ${customerToken}`)
+      .send({ name: 'E2E Test Pizza', description: '', price: 1000, image: '', category: 'pizza' })
+      .expect(403);
+  });
+
+  it('POST /menus creates an item when authenticated as admin', async () => {
     const res = await request(app.getHttpServer())
       .post('/menus')
       .set('Authorization', `Bearer ${token}`)

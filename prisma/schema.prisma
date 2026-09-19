@@ -11,13 +11,20 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+enum Role {
+  ADMIN
+  CUSTOMER
+}
+
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  password  String
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           Int           @id @default(autoincrement())
+  email        String        @unique
+  password     String
+  name         String?
+  role         Role          @default(CUSTOMER)
+  reservations Reservation[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
   @@map("users")
 }
@@ -51,8 +58,13 @@ model Reservation {
   date         DateTime
   status       ReservationStatus @default(PENDING)
   notes        String?
+  // The customer account that made the booking (bookings now require login).
+  // Null for rows created before accounts existed, or if the account is deleted.
+  userId       Int?
+  user         User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
 
+  @@index([userId])
   @@map("reservations")
 }

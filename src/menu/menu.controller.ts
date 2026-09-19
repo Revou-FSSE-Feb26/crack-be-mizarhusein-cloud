@@ -9,10 +9,10 @@ import {
   Post,
   Put,
   Query,
-  UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ApiTags } from '@nestjs/swagger';
+import { Role } from '@prisma/client';
+import { Auth } from '../auth/roles.decorator';
 import { MenuService } from './menu.service';
 import { CreateMenuDto } from './dto/create-menu.dto';
 import { UpdateMenuDto } from './dto/update-menu.dto';
@@ -23,8 +23,7 @@ export class MenuController {
   constructor(private readonly menuService: MenuService) {}
 
   // Admin-only: only the admin dashboard creates/edits/deletes menu items.
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @Auth(Role.ADMIN)
   @Post()
   create(@Body() dto: CreateMenuDto) {
     return this.menuService.create(dto);
@@ -41,22 +40,19 @@ export class MenuController {
     return this.menuService.findOne(id);
   }
 
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @Auth(Role.ADMIN)
   @Put(':id')
   replace(@Param('id', ParseIntPipe) id: number, @Body() dto: CreateMenuDto) {
     return this.menuService.update(id, dto);
   }
 
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @Auth(Role.ADMIN)
   @Patch(':id')
   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateMenuDto) {
     return this.menuService.update(id, dto);
   }
 
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @Auth(Role.ADMIN)
   @Delete(':id')
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.menuService.remove(id);
