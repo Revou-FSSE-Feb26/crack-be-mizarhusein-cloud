@@ -40,7 +40,7 @@ export class ReservationService {
       reservation.status !== ReservationStatus.CONFIRMED
     ) {
       throw new BadRequestException(
-        `A ${reservation.status.toLowerCase()} reservation cannot be cancelled`,
+        `Only pending or confirmed reservations can be cancelled (this one is ${reservation.status.toLowerCase()})`,
       );
     }
     return this.prisma.reservation.update({
