@@ -30,14 +30,15 @@ model User {
 }
 
 model Menu {
-  id          Int      @id @default(autoincrement())
+  id          Int         @id @default(autoincrement())
   name        String
   description String
   price       Float
   image       String
   category    String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  orderItems  OrderItem[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 
   @@map("menus")
 }
@@ -67,4 +68,49 @@ model Reservation {
 
   @@index([userId])
   @@map("reservations")
+}
+
+enum OrderStatus {
+  PENDING
+  PREPARING
+  SERVED
+  COMPLETED
+  CANCELLED
+}
+
+// An order placed from the digital menu. Guests may order without an account,
+// so there is deliberately no user relation. Totals are computed server-side.
+model Order {
+  id           Int         @id @default(autoincrement())
+  customerName String?
+  tableNumber  String?
+  notes        String?
+  status       OrderStatus @default(PENDING)
+  subtotal     Float
+  tax          Float
+  total        Float
+  items        OrderItem[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("orders")
+}
+
+// name/price are a snapshot taken at order time, so the order history stays
+// correct if the menu item is later renamed, repriced, or deleted.
+model OrderItem {
+  id       Int     @id @default(autoincrement())
+  orderId  Int
+  order    Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuId   Int?
+  menu     Menu?   @relation(fields: [menuId], references: [id], onDelete: SetNull)
+  name     String
+  price    Float
+  quantity Int
+  notes    String?
+
+  @@index([orderId])
+  @@map("order_items")
 }
