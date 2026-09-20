@@ -13,8 +13,9 @@ Backend API for Saluna Beach Club built with NestJS, Prisma, and PostgreSQL.
 - **Menu (full CRUD)**: public catalog with category filter; admin-only create, replace, update, delete.
 - **Reservations (full CRUD)**: booking requires a login and is linked to the account; customers see and cancel their own bookings; admins list, filter by status, update, and cancel every booking.
 - **Orders**: guests and logged-in customers place orders from the digital menu. The server prices the order itself from the menu (client prices are rejected) and keeps a name/price snapshot per line. Orders placed while logged in are linked to the account and appear in "my orders". Admins list orders and move them through `PENDING → PREPARING → SERVED → COMPLETED` (or `CANCELLED`).
+- **Admin notification bell**: new reservations and new orders show up as notifications for admins. The server remembers, per admin, when the bell was last opened (one nullable column on `users`, no extra table), so the unread count survives reloads and is the same on every device.
 - **Admin dashboard statistics**: one endpoint with live numbers computed from the database (today's reservations and guests, upcoming and pending reservations, orders and revenue today, active orders, menu size, recent activity).
-- **Quality**: request validation on every endpoint, Swagger/OpenAPI docs, a Postman collection (92 assertions) and 54 end-to-end tests against a real database.
+- **Quality**: request validation on every endpoint, Swagger/OpenAPI docs, a Postman collection (103 assertions) and 61 end-to-end tests against a real database.
 
 ## Database and ERD
 
@@ -47,6 +48,7 @@ erDiagram
         string password "bcrypt hash"
         string name
         Role role "ADMIN or CUSTOMER"
+        datetime notificationsSeenAt "admin bell: last opened"
         datetime createdAt
         datetime updatedAt
     }
@@ -175,7 +177,7 @@ Swagger UI: `http://localhost:4000/api-docs` (or `/api-docs` on the live API)
 
 OpenAPI JSON (import this into Postman as a collection): `http://localhost:4000/api-docs-json`
 
-**Ready-made Postman collection**: `postman/Saluna-Backend-API.postman_collection.json` — covers Auth (login/register, including the 401/409/400 negative cases and a check that a role can't be self-assigned), Menu (public reads, admin-only writes, and a 403 for customers), Reservation (login-required booking, customer "my reservations"/cancel, admin list/update/cancel, and 401/403 negative cases), Order (guest and customer ordering with server-side pricing, "my orders", admin list/status changes, and 400/401/403 cases), Dashboard Stats, and User (profile, password change, admin list/edit/delete, and the safety rules). Import it into Postman and run the whole collection top-to-bottom (Collection Runner, or the ▶ button) — it logs in as the seeded admin and registers a throwaway customer automatically, chains the created menu/reservation ids into the later requests via collection variables, and asserts the expected status code + response shape on every request. It expects the seeded admin, so run `npx prisma db seed` on your local database first. Also runnable headlessly with [Newman](https://www.npmjs.com/package/newman):
+**Ready-made Postman collection**: `postman/Saluna-Backend-API.postman_collection.json` — covers Auth (login/register, including the 401/409/400 negative cases and a check that a role can't be self-assigned), Menu (public reads, admin-only writes, and a 403 for customers), Reservation (login-required booking, customer "my reservations"/cancel, admin list/update/cancel, and 401/403 negative cases), Order (guest and customer ordering with server-side pricing, "my orders", admin list/status changes, and 400/401/403 cases), Dashboard Stats, Notifications, and User (profile, password change, admin list/edit/delete, and the safety rules). Import it into Postman and run the whole collection top-to-bottom (Collection Runner, or the ▶ button) — it logs in as the seeded admin and registers a throwaway customer automatically, chains the created menu/reservation ids into the later requests via collection variables, and asserts the expected status code + response shape on every request. It expects the seeded admin, so run `npx prisma db seed` on your local database first. Also runnable headlessly with [Newman](https://www.npmjs.com/package/newman):
 ```
 npx newman run postman/Saluna-Backend-API.postman_collection.json
 ```
@@ -234,6 +236,15 @@ Orders come from the digital menu on the website. Guests can order without an ac
 | GET    | /orders/:id             | Admin  | Get one order                                           |
 | PATCH  | /orders/:id/status      | Admin  | Move an order along `PENDING` → `PREPARING` → `SERVED` → `COMPLETED`, or set `CANCELLED`. Completed/cancelled orders can't be changed any more. |
 
+### Admin notifications (the bell)
+
+There is no notifications table. A notification is a reservation or order created **after** the moment this admin last opened the bell (`users.notificationsSeenAt`). The first time an admin uses the bell, everything that already exists counts as seen, so the badge doesn't start at the size of the whole history.
+
+| Method | Path                       | Auth  | Description |
+| ------ | -------------------------- | ----- | ----------- |
+| GET    | /admin/notifications       | Admin | `{ unreadCount, seenAt, items }`: the number of new reservations and orders, plus the 10 latest (each flagged `isNew`). The dashboard polls this every 10 seconds. |
+| POST   | /admin/notifications/seen  | Admin | The admin opened the bell: everything so far counts as seen, so the badge clears. Other admins are not affected. |
+
 ### Admin dashboard stats
 
 | Method | Path          | Auth  | Description |
@@ -265,7 +276,7 @@ Migrations that change existing data are applied automatically on deploy. `20260
 npm run test:e2e
 ```
 
-Runs integration tests against a real running database (whatever `DATABASE_URL` points to) — auth (register creates customers, role can't be self-assigned, login/duplicate-email/bad-credentials), menu CRUD (public reads, admin-only writes, 403 for customers), the reservation flow (login required, ownership of "my reservations", customer vs admin permissions, cancelling), orders + dashboard stats (server-side pricing, admin-only access, status flow, price snapshots), and users (profile and password changes, admin management, safety rules, order ownership, immediate effect of role changes and deletions). 54 tests in total. Each spec creates its own throwaway test users/records and cleans them up in `afterAll`; the seeded catalog/admin from `prisma db seed` is untouched. Requires a seeded local database (the menu spec expects the seeded catalog).
+Runs integration tests against a real running database (whatever `DATABASE_URL` points to) — auth (register creates customers, role can't be self-assigned, login/duplicate-email/bad-credentials), menu CRUD (public reads, admin-only writes, 403 for customers), the reservation flow (login required, ownership of "my reservations", customer vs admin permissions, cancelling), orders + dashboard stats (server-side pricing, admin-only access, status flow, price snapshots), notifications (unread counts per admin, clearing the badge, persistence), and users (profile and password changes, admin management, safety rules, order ownership, immediate effect of role changes and deletions). 61 tests in total. Each spec creates its own throwaway test users/records and cleans them up in `afterAll`; the seeded catalog/admin from `prisma db seed` is untouched. Requires a seeded local database (the menu spec expects the seeded catalog).
 
 ## Notes
 

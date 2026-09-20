@@ -2035,6 +2035,258 @@
       ]
     },
     {
+      "name": "Notifications (admin bell)",
+      "item": [
+        {
+          "name": "Notifications - Unauthorized",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/notifications",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "notifications"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test(\"status is 401 without a token\", () => pm.response.to.have.status(401));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Notifications - Forbidden for Customer (expect 403)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/notifications",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "notifications"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test(\"status is 403 for a CUSTOMER token\", () => pm.response.to.have.status(403));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Notifications Feed (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/notifications",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "notifications"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const f = pm.response.json();",
+                  "pm.test(\"has an unread counter and a feed\", () => { pm.expect(f.unreadCount).to.be.a(\"number\"); pm.expect(f.items).to.be.an(\"array\"); });",
+                  "pm.test(\"feed holds at most 10 items\", () => pm.expect(f.items.length).to.be.at.most(10));",
+                  "pm.test(\"every item says whether it is new\", () => pm.expect(f.items.every(i => typeof i.isNew === \"boolean\")).to.be.true);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Open the Bell - Mark Seen (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/notifications/seen",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "notifications",
+                "seen"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"returns the new seenAt\", () => pm.expect(pm.response.json().seenAt).to.be.a(\"string\"));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Notifications After Opening the Bell (unread is 0)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/notifications",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "notifications"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"badge is cleared\", () => pm.expect(pm.response.json().unreadCount).to.eql(0));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mark Seen - Forbidden for Customer (expect 403)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/notifications/seen",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "notifications",
+                "seen"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "{",
+                  "pm.test(\"status is 403 for a CUSTOMER token\", () => pm.response.to.have.status(403));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "User",
       "item": [
         {

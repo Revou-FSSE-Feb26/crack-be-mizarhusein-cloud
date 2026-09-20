@@ -17,15 +17,18 @@ enum Role {
 }
 
 model User {
-  id           Int           @id @default(autoincrement())
-  email        String        @unique
-  password     String
-  name         String?
-  role         Role          @default(CUSTOMER)
-  reservations Reservation[]
-  orders       Order[]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id                  Int           @id @default(autoincrement())
+  email               String        @unique
+  password            String
+  name                String?
+  role                Role          @default(CUSTOMER)
+  reservations        Reservation[]
+  orders              Order[]
+  // Admin notification bell: reservations/orders created after this moment are "new"
+  // for this admin. Moves forward each time the admin opens the bell.
+  notificationsSeenAt DateTime?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
 
   @@map("users")
 }

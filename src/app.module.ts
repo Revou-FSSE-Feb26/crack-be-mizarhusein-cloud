@@ -9,6 +9,7 @@ import { AuthModule } from './auth/auth.module';
 import { OrderModule } from './order/order.module';
 import { StatsModule } from './stats/stats.module';
 import { UsersModule } from './users/users.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { UsersModule } from './users/users.module';
     OrderModule,
     StatsModule,
     UsersModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
