@@ -4,6 +4,101 @@
 
 Backend API for Saluna Beach Club built with NestJS, Prisma, and PostgreSQL.
 
+**Live API:** https://crack-be-mizarhusein-cloud-production.up.railway.app (Swagger UI at `/api-docs`) · **Live website:** https://saluna-beach-club.vercel.app · Frontend repo: [`crack-fe-mizarhusein-cloud`](https://github.com/Revou-FSSE-Feb26/crack-fe-mizarhusein-cloud)
+
+## Features
+
+- **Authentication and roles**: register and login with JWT, bcrypt password hashing, and two roles, `ADMIN` and `CUSTOMER`. Public sign-up always creates a customer; admins are created with a script. Role checks run on every request against the database, so a deleted account or a demoted admin loses access immediately.
+- **Users (full CRUD)**: customers can read and update their own profile (name, password change with current-password check); admins can list, read, edit (name, role) and delete accounts. Password hashes are never returned.
+- **Menu (full CRUD)**: public catalog with category filter; admin-only create, replace, update, delete.
+- **Reservations (full CRUD)**: booking requires a login and is linked to the account; customers see and cancel their own bookings; admins list, filter by status, update, and cancel every booking.
+- **Orders**: guests and logged-in customers place orders from the digital menu. The server prices the order itself from the menu (client prices are rejected) and keeps a name/price snapshot per line. Orders placed while logged in are linked to the account and appear in "my orders". Admins list orders and move them through `PENDING → PREPARING → SERVED → COMPLETED` (or `CANCELLED`).
+- **Admin dashboard statistics**: one endpoint with live numbers computed from the database (today's reservations and guests, upcoming and pending reservations, orders and revenue today, active orders, menu size, recent activity).
+- **Quality**: request validation on every endpoint, Swagger/OpenAPI docs, a Postman collection (92 assertions) and 54 end-to-end tests against a real database.
+
+## Database and ERD
+
+Five tables and four relationships, all enforced with foreign keys:
+
+![Entity relationship diagram](docs/erd.png)
+
+| Relationship | Type | Foreign key | If the parent is deleted |
+| ------------ | ---- | ----------- | ------------------------ |
+| `users` → `reservations` | one-to-many | `reservations.userId` (optional) | the reservation is kept, `userId` becomes null |
+| `users` → `orders` | one-to-many | `orders.userId` (optional, null for guest orders) | the order is kept, `userId` becomes null |
+| `orders` → `order_items` | one-to-many | `order_items.orderId` | the order lines are deleted with the order |
+| `menus` → `order_items` | one-to-many | `order_items.menuId` (optional) | the order line is kept (it stores its own name and price), `menuId` becomes null |
+
+`orders` and `menus` are related many-to-many through `order_items`, which is the join table (it also carries the quantity, notes and the price snapshot). The schema is in [`prisma/schema.prisma`](prisma/schema.prisma) and every change is a migration in [`prisma/migrations`](prisma/migrations).
+
+<details>
+<summary>Mermaid source of the diagram (renders on GitHub)</summary>
+
+```mermaid
+erDiagram
+    users ||--o{ reservations : "makes"
+    users ||--o{ orders : "places"
+    orders ||--|{ order_items : "contains"
+    menus ||--o{ order_items : "is ordered as"
+
+    users {
+        int id PK
+        string email UK
+        string password "bcrypt hash"
+        string name
+        Role role "ADMIN or CUSTOMER"
+        datetime createdAt
+        datetime updatedAt
+    }
+    menus {
+        int id PK
+        string name
+        string description
+        float price
+        string image
+        string category
+        datetime createdAt
+        datetime updatedAt
+    }
+    reservations {
+        int id PK
+        int userId FK "optional"
+        string customerName
+        string email
+        string phone
+        int partySize
+        datetime date
+        ReservationStatus status "PENDING, CONFIRMED, CANCELLED, COMPLETED"
+        string notes
+        datetime createdAt
+        datetime updatedAt
+    }
+    orders {
+        int id PK
+        int userId FK "optional, null for guests"
+        string customerName
+        string tableNumber
+        string notes
+        OrderStatus status "PENDING, PREPARING, SERVED, COMPLETED, CANCELLED"
+        float subtotal
+        float tax
+        float total
+        datetime createdAt
+        datetime updatedAt
+    }
+    order_items {
+        int id PK
+        int orderId FK
+        int menuId FK "optional, kept if the menu item is deleted"
+        string name "snapshot"
+        float price "snapshot"
+        int quantity
+        string notes
+    }
+```
+
+</details>
+
 ## Stack
 
 - NestJS (Express platform)
@@ -74,11 +169,13 @@ The local seed also creates an admin (`admin1@gmail.com` / `admin098`). That pas
 
 ## API docs / Postman
 
-Swagger UI: `http://localhost:4000/api-docs`
+Swagger UI: `http://localhost:4000/api-docs` (or `/api-docs` on the live API)
+
+![Swagger UI](docs/swagger.png)
 
 OpenAPI JSON (import this into Postman as a collection): `http://localhost:4000/api-docs-json`
 
-**Ready-made Postman collection**: `postman/Saluna-Backend-API.postman_collection.json` — covers Auth (login/register, including the 401/409/400 negative cases and a check that a role can't be self-assigned), Menu (public reads, admin-only writes, and a 403 for customers), Reservation (login-required booking, customer "my reservations"/cancel, admin list/update/cancel, and 401/403 negative cases), Order (guest ordering with server-side pricing, admin list/status changes, and 400/401/403 cases), and Dashboard Stats. Import it into Postman and run the whole collection top-to-bottom (Collection Runner, or the ▶ button) — it logs in as the seeded admin and registers a throwaway customer automatically, chains the created menu/reservation ids into the later requests via collection variables, and asserts the expected status code + response shape on every request. It expects the seeded admin, so run `npx prisma db seed` on your local database first. Also runnable headlessly with [Newman](https://www.npmjs.com/package/newman):
+**Ready-made Postman collection**: `postman/Saluna-Backend-API.postman_collection.json` — covers Auth (login/register, including the 401/409/400 negative cases and a check that a role can't be self-assigned), Menu (public reads, admin-only writes, and a 403 for customers), Reservation (login-required booking, customer "my reservations"/cancel, admin list/update/cancel, and 401/403 negative cases), Order (guest and customer ordering with server-side pricing, "my orders", admin list/status changes, and 400/401/403 cases), Dashboard Stats, and User (profile, password change, admin list/edit/delete, and the safety rules). Import it into Postman and run the whole collection top-to-bottom (Collection Runner, or the ▶ button) — it logs in as the seeded admin and registers a throwaway customer automatically, chains the created menu/reservation ids into the later requests via collection variables, and asserts the expected status code + response shape on every request. It expects the seeded admin, so run `npx prisma db seed` on your local database first. Also runnable headlessly with [Newman](https://www.npmjs.com/package/newman):
 ```
 npx newman run postman/Saluna-Backend-API.postman_collection.json
 ```
@@ -110,13 +207,29 @@ npx newman run postman/Saluna-Backend-API.postman_collection.json
 
 Booking requires an account (customers must register/log in first). The full reservation list and menu writes are admin-only because reservations carry customer PII (name/email/phone) and menu changes should only come from the admin dashboard. Get a token from `POST /auth/login` first.
 
+### Users
+
+Accounts are created through `POST /auth/register` (see [Auth](#auth)); these endpoints read and change them. **Password hashes are never included in any response.**
+
+| Method | Path        | Auth               | Description |
+| ------ | ----------- | ------------------ | ----------- |
+| GET    | /users/me   | Any logged-in user | The caller's profile |
+| PATCH  | /users/me   | Any logged-in user | Change `name` and/or password (`currentPassword` + `newPassword`, 6+ chars; the current password is checked). Email and role can't be changed here. Returns `{ user, access_token }` with a fresh token. |
+| GET    | /users      | Admin              | List accounts (optional `?role=ADMIN` or `CUSTOMER`) |
+| GET    | /users/:id  | Admin              | Get one account |
+| PATCH  | /users/:id  | Admin              | Change `name` and/or `role` |
+| DELETE | /users/:id  | Admin              | Delete an account. Their reservations and orders are kept (the link is cleared). |
+
+Safety rules: an admin can't change their own role or delete themselves (so the last admin can't lock everyone out), and a deleted account's token stops working right away.
+
 ### Orders
 
-Orders come from the digital menu on the website. Guests can order without an account, so `POST /orders` is public. The request contains only menu ids and quantities: **the server looks up each price and computes the subtotal, 10% tax and total itself**, so a client can't underpay by editing the request (a `price` field is rejected). Each order line keeps a snapshot of the item's name and price, so history stays correct if the menu changes later.
+Orders come from the digital menu on the website. Guests can order without an account, so `POST /orders` is public (if a valid token is sent, the order is linked to that account). The request contains only menu ids and quantities: **the server looks up each price and computes the subtotal, 10% tax and total itself**, so a client can't underpay by editing the request (a `price` field is rejected). Each order line keeps a snapshot of the item's name and price, so history stays correct if the menu changes later.
 
 | Method | Path                    | Auth   | Description                                            |
 | ------ | ----------------------- | ------ | ------------------------------------------------------- |
 | POST   | /orders                 | Public | Place an order: `{ customerName?, tableNumber?, notes?, items: [{ menuId, quantity, notes? }] }` (1-50 lines, quantity 1-50). Returns the stored order with its `id`. |
+| GET    | /orders/me              | Any logged-in user | The caller's own orders, newest first. A logged-in customer's orders are linked to the account automatically (send the token with `POST /orders`); guest orders are not. |
 | GET    | /orders                 | Admin  | List orders, newest first, with their items (optional `?status=`) |
 | GET    | /orders/:id             | Admin  | Get one order                                           |
 | PATCH  | /orders/:id/status      | Admin  | Move an order along `PENDING` → `PREPARING` → `SERVED` → `COMPLETED`, or set `CANCELLED`. Completed/cancelled orders can't be changed any more. |
@@ -152,7 +265,7 @@ Migrations that change existing data are applied automatically on deploy. `20260
 npm run test:e2e
 ```
 
-Runs integration tests against a real running database (whatever `DATABASE_URL` points to) — auth (register creates customers, role can't be self-assigned, login/duplicate-email/bad-credentials), menu CRUD (public reads, admin-only writes, 403 for customers), the reservation flow (login required, ownership of "my reservations", customer vs admin permissions, cancelling), and orders + dashboard stats (server-side pricing, admin-only access, status flow, price snapshots). Each spec creates its own throwaway test users/records and cleans them up in `afterAll`; the seeded catalog/admin from `prisma db seed` is untouched. Requires a seeded local database (the menu spec expects the seeded catalog).
+Runs integration tests against a real running database (whatever `DATABASE_URL` points to) — auth (register creates customers, role can't be self-assigned, login/duplicate-email/bad-credentials), menu CRUD (public reads, admin-only writes, 403 for customers), the reservation flow (login required, ownership of "my reservations", customer vs admin permissions, cancelling), orders + dashboard stats (server-side pricing, admin-only access, status flow, price snapshots), and users (profile and password changes, admin management, safety rules, order ownership, immediate effect of role changes and deletions). 54 tests in total. Each spec creates its own throwaway test users/records and cleans them up in `afterAll`; the seeded catalog/admin from `prisma db seed` is untouched. Requires a seeded local database (the menu spec expects the seeded catalog).
 
 ## Notes
 

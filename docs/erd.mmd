@@ -1,0 +1,60 @@
+erDiagram
+    users ||--o{ reservations : "makes"
+    users ||--o{ orders : "places"
+    orders ||--|{ order_items : "contains"
+    menus ||--o{ order_items : "is ordered as"
+
+    users {
+        int id PK
+        string email UK
+        string password "bcrypt hash"
+        string name
+        Role role "ADMIN or CUSTOMER"
+        datetime createdAt
+        datetime updatedAt
+    }
+    menus {
+        int id PK
+        string name
+        string description
+        float price
+        string image
+        string category
+        datetime createdAt
+        datetime updatedAt
+    }
+    reservations {
+        int id PK
+        int userId FK "optional"
+        string customerName
+        string email
+        string phone
+        int partySize
+        datetime date
+        ReservationStatus status "PENDING, CONFIRMED, CANCELLED, COMPLETED"
+        string notes
+        datetime createdAt
+        datetime updatedAt
+    }
+    orders {
+        int id PK
+        int userId FK "optional, null for guests"
+        string customerName
+        string tableNumber
+        string notes
+        OrderStatus status "PENDING, PREPARING, SERVED, COMPLETED, CANCELLED"
+        float subtotal
+        float tax
+        float total
+        datetime createdAt
+        datetime updatedAt
+    }
+    order_items {
+        int id PK
+        int orderId FK
+        int menuId FK "optional, kept if the menu item is deleted"
+        string name "snapshot"
+        float price "snapshot"
+        int quantity
+        string notes
+    }

@@ -18,7 +18,7 @@ async function bootstrap() {
   const config = new DocumentBuilder()
     .setTitle('Saluna API')
     .setDescription(
-      'Backend API for Saluna (Arabian Taste) — auth, menus & reservations',
+      'Backend API for Saluna (Arabian Taste) — auth, users, menus, reservations, orders & admin stats',
     )
     .setVersion('1.0')
     .addBearerAuth()
