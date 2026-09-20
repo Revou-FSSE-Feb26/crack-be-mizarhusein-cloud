@@ -15,7 +15,8 @@ const FINISHED: OrderStatus[] = [OrderStatus.COMPLETED, OrderStatus.CANCELLED];
 export class OrderService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(dto: CreateOrderDto) {
+  // userId is set when a logged-in customer places the order, null for a guest.
+  async create(dto: CreateOrderDto, userId: number | null = null) {
     // Merge duplicate menu ids into one lookup, but keep every line as ordered.
     const menuIds = [...new Set(dto.items.map((i) => i.menuId))];
     const menus = await this.prisma.menu.findMany({
@@ -49,12 +50,22 @@ export class OrderService {
         customerName: dto.customerName?.trim() || null,
         tableNumber: dto.tableNumber?.trim() || null,
         notes: dto.notes?.trim() || null,
+        userId,
         subtotal,
         tax,
         total: subtotal + tax,
         items: { create: lines },
       },
       include: { items: true },
+    });
+  }
+
+  // A customer's own orders, newest first.
+  findMine(userId: number) {
+    return this.prisma.order.findMany({
+      where: { userId },
+      include: { items: true },
+      orderBy: { createdAt: 'desc' },
     });
   }
 

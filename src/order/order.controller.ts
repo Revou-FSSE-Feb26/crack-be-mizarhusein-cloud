@@ -7,10 +7,13 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { OrderStatus, Role } from '@prisma/client';
-import { Auth } from '../auth/roles.decorator';
+import type { AuthUser } from '../auth/jwt.strategy';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
+import { Auth, CurrentUser } from '../auth/roles.decorator';
 import { OrderService } from './order.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
@@ -21,9 +24,18 @@ export class OrderController {
   constructor(private readonly orderService: OrderService) {}
 
   // Public: the digital menu at the venue lets guests order without an account.
+  // If a valid token is sent, the order is linked to that customer's account.
+  @UseGuards(OptionalJwtAuthGuard)
   @Post()
-  create(@Body() dto: CreateOrderDto) {
-    return this.orderService.create(dto);
+  create(@Body() dto: CreateOrderDto, @CurrentUser() user: AuthUser | null) {
+    return this.orderService.create(dto, user?.userId ?? null);
+  }
+
+  // A logged-in customer's own order history. Declared before ':id'.
+  @Auth()
+  @Get('me')
+  findMine(@CurrentUser() user: AuthUser) {
+    return this.orderService.findMine(user.userId);
   }
 
   // Admin-only below: orders show what and how much each guest ordered.

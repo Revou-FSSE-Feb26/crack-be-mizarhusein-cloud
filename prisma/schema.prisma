@@ -23,6 +23,7 @@ model User {
   name         String?
   role         Role          @default(CUSTOMER)
   reservations Reservation[]
+  orders       Order[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
@@ -86,6 +87,10 @@ model Order {
   tableNumber  String?
   notes        String?
   status       OrderStatus @default(PENDING)
+  // Set when a logged-in customer places the order; null for guest orders
+  // (or if the account is deleted later).
+  userId       Int?
+  user         User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
   subtotal     Float
   tax          Float
   total        Float
@@ -95,6 +100,7 @@ model Order {
 
   @@index([status])
   @@index([createdAt])
+  @@index([userId])
   @@map("orders")
 }
 

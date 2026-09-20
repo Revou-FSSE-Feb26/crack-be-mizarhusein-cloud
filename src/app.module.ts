@@ -8,6 +8,7 @@ import { ReservationModule } from './reservation/reservation.module';
 import { AuthModule } from './auth/auth.module';
 import { OrderModule } from './order/order.module';
 import { StatsModule } from './stats/stats.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { StatsModule } from './stats/stats.module';
     ReservationModule,
     OrderModule,
     StatsModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
