@@ -49,10 +49,12 @@ export class ReservationService {
     });
   }
 
+  // Newest submissions first, regardless of which date/time they booked for
+  // (that's what the admin table is meant to show, per the venue's feedback).
   findAll(status?: ReservationStatus) {
     return this.prisma.reservation.findMany({
       where: status ? { status } : undefined,
-      orderBy: { date: 'asc' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     });
   }
 
